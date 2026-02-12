@@ -5,6 +5,7 @@ import cookieParser from 'cookie-parser';
 
 import { errorMiddleware } from './middlewares/error.middleware';
 import authRouter from './routes/auth.router';
+import userRouter from './routes/user.router';
 import { corsOptions } from './config/cors.config';
 import { PORT } from './config/main.config';
 
@@ -18,6 +19,7 @@ app.use(morgan('tiny'));
 
 // Routes
 app.use('/api/auth', authRouter);
+app.use('/api/users', userRouter);
 
 // Centralized Error Handler
 app.use(errorMiddleware);
