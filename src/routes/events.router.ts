@@ -5,6 +5,7 @@ import {
   getDetail,
   update,
   remove,
+  createVoucher,
 } from "../controllers/events.controller";
 import { verifyToken, roleGuard } from "../middlewares/auth.middleware";
 import { multerUpload } from "../helpers/multer.helper";
@@ -41,6 +42,13 @@ router.delete(
   verifyToken,
   roleGuard("EO"),
   remove
+);
+
+router.post(
+  "/:eventId/vouchers",
+  verifyToken,
+  roleGuard("EO"),
+  createVoucher
 );
 
 export default router;

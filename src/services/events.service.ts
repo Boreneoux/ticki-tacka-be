@@ -63,20 +63,63 @@ export const eventService = {
     return event;
   },
 
-  async getAllEvents() {
-    return prisma.event.findMany({
-      where: {
-        deletedAt: null,
+  async getAllEvents(query: any) {
+    const { search, category, city, page = 1, limit = 10 } = query;
+
+    const where: any = {
+      deletedAt: null,
+      status: "published",
+      eventDate: {
+        gte: new Date(),
+      },
+    };
+
+    if (search) {
+      where.name = {
+        contains: search,
+        mode: "insensitive",
+      };
+    }
+
+    if (category) {
+      where.categoryId = category;
+    }
+
+    if (city) {
+      where.cityId = city;
+    }
+
+    const events = await prisma.event.findMany({
+      where,
+      include: {
+        category: true,
+        city: true,
+        eventImages: true,
+        ticketTypes: true,
+      },
+      skip: (Number(page) - 1) * Number(limit),
+      take: Number(limit),
+      orderBy: {
+        eventDate: "asc",
       },
     });
+
+    return events;
   },
 
   async getEventBySlug(slug: string) {
     const event = await prisma.event.findUnique({
       where: { slug },
+      include: {
+        category: true,
+        city: true,
+        eventImages: true,
+        ticketTypes: true,
+        eventVouchers: true,
+      },
     });
 
-    if (!event) {
+    if (!event || event.deletedAt) {
       throw new AppError("Event not found", 404);
     }
 
@@ -169,5 +212,25 @@ export const eventService = {
     });
 
     return null;
+  },
+
+  async createVoucher(eventId: string, userId: string, data: any) {
+    const event = await prisma.event.findFirst({
+      where: {
+        id: eventId,
+        organizerId: userId,
+      },
+    });
+
+    if (!event) {
+      throw new AppError("Event not found", 404);
+    }
+
+    return prisma.eventVoucher.create({
+      data: {
+        ...data,
+        eventId,
+      },
+    });
   },
 };

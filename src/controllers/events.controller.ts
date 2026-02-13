@@ -19,8 +19,8 @@ export const create = catchAsync(
 );
 
 export const getAll = catchAsync(
-  async (_req: Request, res: Response) => {
-    const result = await eventService.getAllEvents();
+  async (req: Request, res: Response) => {
+    const result = await eventService.getAllEvents(req.query);
 
     res.status(200).json({
       success: true,
@@ -32,7 +32,7 @@ export const getAll = catchAsync(
 export const getDetail = catchAsync(
   async (req: Request, res: Response) => {
     const result = await eventService.getEventBySlug(
-      req.params.slug as string
+      String(req.params.slug)
     );
 
     res.status(200).json({
@@ -45,7 +45,7 @@ export const getDetail = catchAsync(
 export const update = catchAsync(
   async (req: Request, res: Response) => {
     const result = await eventService.updateEvent(
-      req.params.id as string,
+      String(req.params.id),
       req.user!.id,
       req.body,
       req.files as Express.Multer.File[]
@@ -61,13 +61,29 @@ export const update = catchAsync(
 export const remove = catchAsync(
   async (req: Request, res: Response) => {
     await eventService.deleteEvent(
-      req.params.id as string,
+      String(req.params.id),
       req.user!.id
     );
 
     res.status(200).json({
       success: true,
       message: "Event deleted successfully",
+    });
+  }
+);
+
+export const createVoucher = catchAsync(
+  async (req: Request, res: Response) => {
+    const result = await eventService.createVoucher(
+      String(req.params.eventId),
+      req.user!.id,
+      req.body
+    );
+
+    res.status(201).json({
+      success: true,
+      message: "Voucher created successfully",
+      data: result,
     });
   }
 );
