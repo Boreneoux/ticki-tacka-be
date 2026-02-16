@@ -1,5 +1,10 @@
 import { prisma } from '../config/prisma-client.config';
 import { AppError } from '../utils/AppError';
+import {
+  buildCloudinaryFolder,
+  cloudinaryUpload,
+  cloudinaryDelete
+} from '../helpers/cloudinary.helper';
 import { PrismaClient } from '../generated/prisma/client';
 
 type TransactionClient = Parameters<
@@ -321,5 +326,86 @@ export const transactionService = {
     });
 
     return fullTransaction;
+  },
+
+  async uploadPaymentProof(
+    transactionId: string,
+    userId: string,
+    file: Express.Multer.File
+  ) {
+    const transaction = await prisma.transaction.findUnique({
+      where: { id: transactionId }
+    });
+
+    if (!transaction || transaction.deletedAt) {
+      throw new AppError('Transaction not found', 404);
+    }
+
+    if (transaction.userId !== userId) {
+      throw new AppError('This transaction does not belong to you', 403);
+    }
+
+    if (transaction.paymentStatus !== 'waiting_for_payment') {
+      throw new AppError(
+        `Cannot upload proof for transaction with status '${transaction.paymentStatus}'`,
+        400
+      );
+    }
+
+    if (new Date(transaction.paymentDeadline) < new Date()) {
+      throw new AppError('Payment deadline has passed', 400);
+    }
+
+    if (!file) {
+      throw new AppError('Payment proof image is required', 400);
+    }
+
+    // Upload to Cloudinary
+    let uploadResult: { secureUrl: string; publicId: string };
+
+    try {
+      const folder = buildCloudinaryFolder(
+        'transactions',
+        transactionId,
+        'payment-proof'
+      );
+      uploadResult = await cloudinaryUpload(file.buffer, folder);
+    } catch {
+      throw new AppError('Failed to upload payment proof', 500);
+    }
+
+    try {
+      // Delete old proof from Cloudinary if re-uploading
+      if (transaction.paymentProofUrl) {
+        // We don't have publicId stored for payment proof in schema,
+        // so we skip deleting old one unless schema supports it
+      }
+
+      const confirmationDeadline = new Date(
+        Date.now() + 3 * 24 * 60 * 60 * 1000
+      ); // +3 days
+
+      const updated = await prisma.transaction.update({
+        where: { id: transactionId },
+        data: {
+          paymentProofUrl: uploadResult.secureUrl,
+          proofUploadedAt: new Date(),
+          paymentStatus: 'waiting_for_admin_confirmation',
+          confirmationDeadline
+        },
+        include: {
+          transactionItems: {
+            include: { ticketType: true }
+          },
+          event: true
+        }
+      });
+
+      return updated;
+    } catch (error) {
+      // Rollback: delete uploaded image from Cloudinary
+      await cloudinaryDelete(uploadResult.publicId);
+      throw error;
+    }
   }
 };
