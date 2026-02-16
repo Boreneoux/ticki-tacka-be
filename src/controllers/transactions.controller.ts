@@ -20,5 +20,21 @@ export const transactionController = {
             message: 'Transaction created successfully',
             data: result
         });
+    }),
+
+    uploadPaymentProof: catchAsync(async (req: Request, res: Response) => {
+        const transactionId = req.params.id as string;
+
+        const result = await transactionService.uploadPaymentProof(
+            transactionId,
+            req.user!.id,
+            req.file as Express.Multer.File
+        );
+
+        res.status(200).json({
+            success: true,
+            message: 'Payment proof uploaded successfully',
+            data: result
+        });
     })
 };
