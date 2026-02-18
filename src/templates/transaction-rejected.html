@@ -1,0 +1,92 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  </head>
+  <body
+    style="
+      font-family: Arial, sans-serif;
+      background-color: #f4f4f9;
+      margin: 0;
+      padding: 20px;
+    "
+  >
+    <table
+      width="100%"
+      cellpadding="0"
+      cellspacing="0"
+      style="
+        max-width: 600px;
+        margin: 0 auto;
+        background-color: #ffffff;
+        border-radius: 8px;
+        overflow: hidden;
+        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+      "
+    >
+      <tr>
+        <td
+          style="background-color: #05668d; padding: 30px; text-align: center"
+        >
+          <h1
+            style="
+              color: #ffffff;
+              margin: 0;
+              font-size: 28px;
+              letter-spacing: 1px;
+            "
+          >
+            TickiTacka
+          </h1>
+        </td>
+      </tr>
+      <tr>
+        <td style="padding: 30px">
+          <h2 style="color: #d9534f; margin-top: 0">
+            Transaction Unsuccessful
+          </h2>
+          <p style="color: #555555; line-height: 1.6">Hi {{userName}},</p>
+          <p style="color: #555555; line-height: 1.6">
+            Unfortunately, we couldn't process your payment for
+            <strong>{{eventName}}</strong>.
+          </p>
+          <p style="color: #555555; line-height: 1.6">
+            No charges were made to your account. This usually happens due to
+            incorrect billing details or insufficient funds. You can try
+            completing your purchase again using a different payment method.
+          </p>
+
+          <div style="text-align: center; margin-top: 30px">
+            <a
+              href="{{retryLink}}"
+              style="
+                background-color: #05668d;
+                color: #ffffff;
+                padding: 12px 25px;
+                text-decoration: none;
+                border-radius: 5px;
+                font-weight: bold;
+                display: inline-block;
+              "
+              >Try Payment Again</a
+            >
+          </div>
+        </td>
+      </tr>
+      <tr>
+        <td
+          style="
+            background-color: #f9f9f9;
+            padding: 20px;
+            text-align: center;
+            color: #888888;
+            font-size: 12px;
+          "
+        >
+          <p style="margin: 0">© 2026 TickiTacka. All rights reserved.</p>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>

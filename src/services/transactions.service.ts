@@ -6,6 +6,11 @@ import {
   cloudinaryDelete
 } from '../helpers/cloudinary.helper';
 import { PrismaClient } from '../generated/prisma/client';
+import transporter from '../helpers/nodemailer.helper';
+import { USER_EMAILER, FRONTEND_URL } from '../config/main.config';
+import handlebars from 'handlebars';
+import fs from 'fs';
+import path from 'path';
 
 type TransactionClient = Parameters<
   Parameters<PrismaClient['$transaction']>[0]
@@ -699,6 +704,237 @@ export const transactionService = {
 
       return canceled;
     });
+
+    return result;
+  },
+
+  async acceptTransaction(userId: string, transactionId: string) {
+    const organizer = await prisma.organizer.findUnique({
+      where: { userId }
+    });
+
+    if (!organizer) {
+      throw new AppError('Organizer not found', 404);
+    }
+
+    const transaction = await prisma.transaction.findUnique({
+      where: { id: transactionId },
+      include: {
+        event: {
+          select: {
+            id: true,
+            name: true,
+            slug: true,
+            organizerId: true,
+            eventDate: true,
+            eventTime: true,
+            venueName: true
+          }
+        },
+        user: {
+          select: {
+            id: true,
+            fullName: true,
+            email: true
+          }
+        },
+        transactionItems: {
+          include: {
+            ticketType: { select: { name: true } }
+          }
+        }
+      }
+    });
+
+    if (!transaction || transaction.deletedAt) {
+      throw new AppError('Transaction not found', 404);
+    }
+
+    if (transaction.event.organizerId !== organizer.id) {
+      throw new AppError('You do not have access to this transaction', 403);
+    }
+
+    if (transaction.paymentStatus !== 'waiting_for_admin_confirmation') {
+      throw new AppError(
+        `Only transactions with status "waiting_for_admin_confirmation" can be accepted`,
+        400
+      );
+    }
+
+    const updated = await prisma.transaction.update({
+      where: { id: transactionId },
+      data: {
+        paymentStatus: 'done',
+        confirmedAt: new Date()
+      },
+      include: organizerTransactionInclude
+    });
+
+    const totalQuantity = transaction.transactionItems.reduce(
+      (sum, item) => sum + item.quantity,
+      0
+    );
+    const ticketTypeNames = transaction.transactionItems
+      .map(item => item.ticketType.name)
+      .join(', ');
+
+    const eventDate = new Date(transaction.event.eventDate).toLocaleDateString(
+      'en-US',
+      { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }
+    );
+
+    const templatePath = path.join(
+      __dirname,
+      '../templates/transaction-accepted.html'
+    );
+    const templateSource = fs.readFileSync(templatePath, 'utf-8');
+    const compiledTemplate = handlebars.compile(templateSource);
+    const html = compiledTemplate({
+      userName: transaction.user.fullName,
+      eventName: transaction.event.name,
+      orderId: transaction.invoiceNumber,
+      eventDate,
+      ticketQuantity: totalQuantity,
+      ticketType: ticketTypeNames,
+      ticketLink: `${FRONTEND_URL}/transactions/${transaction.id}`
+    });
+
+    transporter
+      .sendMail({
+        from: USER_EMAILER,
+        to: transaction.user.email,
+        subject: `🎉 Your tickets for ${transaction.event.name} are confirmed!`,
+        html
+      })
+      .catch((err: unknown) => {
+        console.error('Failed to send acceptance email:', err);
+      });
+
+    return updated;
+  },
+
+  async rejectTransaction(userId: string, transactionId: string) {
+    const organizer = await prisma.organizer.findUnique({
+      where: { userId }
+    });
+
+    if (!organizer) {
+      throw new AppError('Organizer not found', 404);
+    }
+
+    const transaction = await prisma.transaction.findUnique({
+      where: { id: transactionId },
+      include: {
+        event: {
+          select: {
+            id: true,
+            name: true,
+            slug: true,
+            organizerId: true
+          }
+        },
+        user: {
+          select: {
+            id: true,
+            fullName: true,
+            email: true
+          }
+        },
+        transactionItems: true,
+        pointUsages: true,
+        eventVoucherUsages: true
+      }
+    });
+
+    if (!transaction || transaction.deletedAt) {
+      throw new AppError('Transaction not found', 404);
+    }
+
+    if (transaction.event.organizerId !== organizer.id) {
+      throw new AppError('You do not have access to this transaction', 403);
+    }
+
+    if (transaction.paymentStatus !== 'waiting_for_admin_confirmation') {
+      throw new AppError(
+        `Only transactions with status "waiting_for_admin_confirmation" can be rejected`,
+        400
+      );
+    }
+
+    const result = await prisma.$transaction(async (tx: TransactionClient) => {
+      for (const item of transaction.transactionItems) {
+        await tx.ticketType.update({
+          where: { id: item.ticketTypeId },
+          data: { soldCount: { decrement: item.quantity } }
+        });
+      }
+
+      for (const pu of transaction.pointUsages) {
+        await tx.userPoint.update({
+          where: { id: pu.userPointId },
+          data: {
+            amount: { increment: pu.amountUsed },
+            isUsed: false
+          }
+        });
+      }
+
+      await tx.pointUsage.deleteMany({
+        where: { transactionId: transaction.id }
+      });
+
+      if (transaction.userCouponId) {
+        await tx.userCoupon.update({
+          where: { id: transaction.userCouponId },
+          data: { isUsed: false, usedAt: null }
+        });
+      }
+
+      if (transaction.eventVoucherId) {
+        await tx.eventVoucher.update({
+          where: { id: transaction.eventVoucherId },
+          data: { usedCount: { decrement: 1 } }
+        });
+      }
+
+      await tx.eventVoucherUsage.deleteMany({
+        where: { transactionId: transaction.id }
+      });
+
+      const rejected = await tx.transaction.update({
+        where: { id: transaction.id },
+        data: {
+          paymentStatus: 'rejected',
+          confirmedAt: new Date()
+        },
+        include: organizerTransactionInclude
+      });
+
+      return rejected;
+    });
+
+    const templatePath = path.join(
+      __dirname,
+      '../templates/transaction-rejected.html'
+    );
+    const templateSource = fs.readFileSync(templatePath, 'utf-8');
+    const compiledTemplate = handlebars.compile(templateSource);
+    const html = compiledTemplate({
+      userName: transaction.user.fullName,
+      eventName: transaction.event.name,
+      retryLink: `${FRONTEND_URL}/events/${transaction.event.slug}`
+    });
+
+    transporter
+      .sendMail({
+        from: USER_EMAILER,
+        to: transaction.user.email,
+        subject: `Transaction update for ${transaction.event.name}`,
+        html
+      })
+      .catch((err: unknown) => {
+        console.error('Failed to send rejection email:', err);
+      });
 
     return result;
   }

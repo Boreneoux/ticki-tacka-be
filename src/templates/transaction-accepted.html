@@ -1,0 +1,156 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  </head>
+  <body
+    style="
+      font-family: Arial, sans-serif;
+      background-color: #f4f4f9;
+      margin: 0;
+      padding: 20px;
+    "
+  >
+    <table
+      width="100%"
+      cellpadding="0"
+      cellspacing="0"
+      style="
+        max-width: 600px;
+        margin: 0 auto;
+        background-color: #ffffff;
+        border-radius: 8px;
+        overflow: hidden;
+        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+      "
+    >
+      <tr>
+        <td
+          style="background-color: #05668d; padding: 30px; text-align: center"
+        >
+          <h1
+            style="
+              color: #ffffff;
+              margin: 0;
+              font-size: 28px;
+              letter-spacing: 1px;
+            "
+          >
+            TickiTacka
+          </h1>
+        </td>
+      </tr>
+      <tr>
+        <td style="padding: 30px">
+          <h2 style="color: #333333; margin-top: 0">
+            You're going to {{eventName}}! 🎉
+          </h2>
+          <p style="color: #555555; line-height: 1.6">Hi {{userName}},</p>
+          <p style="color: #555555; line-height: 1.6">
+            Your payment was successful and your tickets are secured. Here are
+            the details of your transaction:
+          </p>
+
+          <table width="100%" style="margin: 20px 0; border-collapse: collapse">
+            <tr>
+              <td
+                style="
+                  padding: 10px;
+                  border-bottom: 1px solid #eeeeee;
+                  color: #555555;
+                "
+              >
+                <strong>Order ID:</strong>
+              </td>
+              <td
+                style="
+                  padding: 10px;
+                  border-bottom: 1px solid #eeeeee;
+                  color: #333333;
+                  text-align: right;
+                "
+              >
+                #{{orderId}}
+              </td>
+            </tr>
+            <tr>
+              <td
+                style="
+                  padding: 10px;
+                  border-bottom: 1px solid #eeeeee;
+                  color: #555555;
+                "
+              >
+                <strong>Date & Time:</strong>
+              </td>
+              <td
+                style="
+                  padding: 10px;
+                  border-bottom: 1px solid #eeeeee;
+                  color: #333333;
+                  text-align: right;
+                "
+              >
+                {{eventDate}}
+              </td>
+            </tr>
+            <tr>
+              <td
+                style="
+                  padding: 10px;
+                  border-bottom: 1px solid #eeeeee;
+                  color: #555555;
+                "
+              >
+                <strong>Tickets:</strong>
+              </td>
+              <td
+                style="
+                  padding: 10px;
+                  border-bottom: 1px solid #eeeeee;
+                  color: #333333;
+                  text-align: right;
+                "
+              >
+                {{ticketQuantity}}x {{ticketType}}
+              </td>
+            </tr>
+          </table>
+
+          <div style="text-align: center; margin-top: 30px">
+            <a
+              href="{{ticketLink}}"
+              style="
+                background-color: #05668d;
+                color: #ffffff;
+                padding: 12px 25px;
+                text-decoration: none;
+                border-radius: 5px;
+                font-weight: bold;
+                display: inline-block;
+              "
+              >View Your Tickets</a
+            >
+          </div>
+        </td>
+      </tr>
+      <tr>
+        <td
+          style="
+            background-color: #f9f9f9;
+            padding: 20px;
+            text-align: center;
+            color: #888888;
+            font-size: 12px;
+          "
+        >
+          <p style="margin: 0">© 2026 TickiTacka. All rights reserved.</p>
+          <p style="margin: 5px 0 0 0">
+            Need help? Reply to this email or visit our Help Center.
+          </p>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>
