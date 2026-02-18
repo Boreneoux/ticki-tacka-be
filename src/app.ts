@@ -11,6 +11,9 @@ import eventRouter from './routes/events.router';
 import ticketTypeRouter from './routes/ticket-types.router';
 import categoryRouter from './routes/categories.router';
 import transactionRouter from './routes/transactions.router';
+import reviewRouter from './routes/reviews.router';
+import { organizerReviewRouter } from './routes/reviews.router';
+
 import { corsOptions } from './config/cors.config';
 import { PORT } from './config/main.config';
 
@@ -29,6 +32,8 @@ app.use('/api/locations', locationRouter);
 app.use('/api/transactions', transactionRouter);
 app.use('/api/events', eventRouter);
 app.use('/api/categories', categoryRouter);
+app.use('/api/events/:eventId/reviews', reviewRouter);
+app.use('/api/organizers/:organizerId/reviews', organizerReviewRouter);
 // Centralized Error Handler
 app.use(errorMiddleware);
 
