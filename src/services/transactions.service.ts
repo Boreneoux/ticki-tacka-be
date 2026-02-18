@@ -24,12 +24,72 @@ interface CreateTransactionInput {
   eventVoucherId?: string;
 }
 
+interface GetCustomerTransactionsQuery {
+  status?: string;
+  page?: string;
+  limit?: string;
+}
+
+interface GetOrganizerTransactionsQuery {
+  status?: string;
+  eventId?: string;
+  page?: string;
+  limit?: string;
+}
+
 function generateInvoiceNumber(): string {
   const now = new Date();
   const dateStr = now.toISOString().slice(0, 10).replace(/-/g, '');
   const random = Math.random().toString(36).substring(2, 8).toUpperCase();
   return `INV-${dateStr}-${random}`;
 }
+
+const customerTransactionInclude = {
+  event: {
+    select: {
+      id: true,
+      name: true,
+      slug: true,
+      eventDate: true,
+      eventTime: true,
+      venueName: true,
+      eventImages: { take: 1, select: { imageUrl: true } }
+    }
+  },
+  transactionItems: {
+    include: { ticketType: { select: { id: true, name: true, price: true } } }
+  },
+  pointUsages: true,
+  eventVoucherUsages: true
+} as const;
+
+const organizerTransactionInclude = {
+  user: {
+    select: {
+      id: true,
+      username: true,
+      fullName: true,
+      email: true,
+      profilePictureUrl: true
+    }
+  },
+  event: {
+    select: {
+      id: true,
+      name: true,
+      slug: true,
+      eventDate: true,
+      eventTime: true,
+      venueName: true,
+      eventImages: { take: 1, select: { imageUrl: true } }
+    }
+  },
+  transactionItems: {
+    include: { ticketType: { select: { id: true, name: true, price: true } } }
+  },
+  pointUsages: true,
+  eventVoucherUsages: true
+} as const;
 
 export const transactionService = {
   async createTransaction(userId: string, input: CreateTransactionInput) {
@@ -407,5 +467,239 @@ export const transactionService = {
       await cloudinaryDelete(uploadResult.publicId);
       throw error;
     }
+  },
+
+  async getCustomerTransactions(
+    userId: string,
+    query: GetCustomerTransactionsQuery
+  ) {
+    const { status, page = '1', limit = '10' } = query;
+
+    const pageNum = Math.max(1, Number(page));
+    const limitNum = Math.max(1, Math.min(50, Number(limit)));
+
+    const where: any = {
+      userId,
+      deletedAt: null
+    };
+
+    if (status) {
+      where.paymentStatus = status;
+    }
+
+    const [transactions, totalCount] = await Promise.all([
+      prisma.transaction.findMany({
+        where,
+        include: customerTransactionInclude,
+        skip: (pageNum - 1) * limitNum,
+        take: limitNum,
+        orderBy: { createdAt: 'desc' }
+      }),
+      prisma.transaction.count({ where })
+    ]);
+
+    return {
+      transactions,
+      pagination: {
+        page: pageNum,
+        limit: limitNum,
+        totalCount,
+        totalPages: Math.ceil(totalCount / limitNum)
+      }
+    };
+  },
+
+  async getCustomerTransactionById(userId: string, transactionId: string) {
+    const transaction = await prisma.transaction.findUnique({
+      where: { id: transactionId },
+      include: customerTransactionInclude
+    });
+
+    if (!transaction || transaction.deletedAt) {
+      throw new AppError('Transaction not found', 404);
+    }
+
+    if (transaction.userId !== userId) {
+      throw new AppError('You do not have access to this transaction', 403);
+    }
+
+    return transaction;
+  },
+
+  async getOrganizerTransactions(
+    userId: string,
+    query: GetOrganizerTransactionsQuery
+  ) {
+    const { status, eventId, page = '1', limit = '10' } = query;
+
+    const organizer = await prisma.organizer.findUnique({
+      where: { userId }
+    });
+
+    if (!organizer) {
+      throw new AppError('Organizer not found', 404);
+    }
+
+    const pageNum = Math.max(1, Number(page));
+    const limitNum = Math.max(1, Math.min(50, Number(limit)));
+
+    const where: any = {
+      deletedAt: null,
+      event: {
+        organizerId: organizer.id,
+        deletedAt: null
+      }
+    };
+
+    if (status) {
+      where.paymentStatus = status;
+    }
+
+    if (eventId) {
+      where.eventId = eventId;
+    }
+
+    const [transactions, totalCount] = await Promise.all([
+      prisma.transaction.findMany({
+        where,
+        include: organizerTransactionInclude,
+        skip: (pageNum - 1) * limitNum,
+        take: limitNum,
+        orderBy: { createdAt: 'desc' }
+      }),
+      prisma.transaction.count({ where })
+    ]);
+
+    return {
+      transactions,
+      pagination: {
+        page: pageNum,
+        limit: limitNum,
+        totalCount,
+        totalPages: Math.ceil(totalCount / limitNum)
+      }
+    };
+  },
+
+  async getOrganizerTransactionById(userId: string, transactionId: string) {
+    const organizer = await prisma.organizer.findUnique({
+      where: { userId }
+    });
+
+    if (!organizer) {
+      throw new AppError('Organizer not found', 404);
+    }
+
+    const transaction = await prisma.transaction.findUnique({
+      where: { id: transactionId },
+      include: {
+        ...organizerTransactionInclude,
+        userCoupon: {
+          select: { couponCode: true, discountType: true, discountValue: true }
+        },
+        eventVoucher: {
+          select: {
+            voucherCode: true,
+            voucherName: true,
+            discountType: true,
+            discountValue: true
+          }
+        }
+      }
+    });
+
+    if (!transaction || transaction.deletedAt) {
+      throw new AppError('Transaction not found', 404);
+    }
+
+    const event = await prisma.event.findFirst({
+      where: {
+        id: transaction.eventId,
+        organizerId: organizer.id
+      }
+    });
+
+    if (!event) {
+      throw new AppError('You do not have access to this transaction', 403);
+    }
+
+    return transaction;
+  },
+
+  async cancelTransaction(userId: string, transactionId: string) {
+    const transaction = await prisma.transaction.findUnique({
+      where: { id: transactionId },
+      include: {
+        transactionItems: true,
+        pointUsages: true,
+        eventVoucherUsages: true
+      }
+    });
+
+    if (!transaction || transaction.deletedAt) {
+      throw new AppError('Transaction not found', 404);
+    }
+
+    if (transaction.userId !== userId) {
+      throw new AppError('You do not have access to this transaction', 403);
+    }
+
+    if (transaction.paymentStatus !== 'waiting_for_payment') {
+      throw new AppError(
+        'Only transactions with status "waiting_for_payment" can be canceled',
+        400
+      );
+    }
+
+    const result = await prisma.$transaction(async (tx: TransactionClient) => {
+      for (const item of transaction.transactionItems) {
+        await tx.ticketType.update({
+          where: { id: item.ticketTypeId },
+          data: { soldCount: { decrement: item.quantity } }
+        });
+      }
+
+      for (const pu of transaction.pointUsages) {
+        await tx.userPoint.update({
+          where: { id: pu.userPointId },
+          data: {
+            amount: { increment: pu.amountUsed },
+            isUsed: false
+          }
+        });
+      }
+
+      if (transaction.userCouponId) {
+        await tx.userCoupon.update({
+          where: { id: transaction.userCouponId },
+          data: { isUsed: false, usedAt: null }
+        });
+      }
+
+      if (transaction.eventVoucherId) {
+        await tx.eventVoucher.update({
+          where: { id: transaction.eventVoucherId },
+          data: { usedCount: { decrement: 1 } }
+        });
+      }
+
+      await tx.pointUsage.deleteMany({
+        where: { transactionId: transaction.id }
+      });
+
+      await tx.eventVoucherUsage.deleteMany({
+        where: { transactionId: transaction.id }
+      });
+
+      const canceled = await tx.transaction.update({
+        where: { id: transaction.id },
+        data: { paymentStatus: 'canceled' },
+        include: customerTransactionInclude
+      });
+
+      return canceled;
+    });
+
+    return result;
   }
 };
