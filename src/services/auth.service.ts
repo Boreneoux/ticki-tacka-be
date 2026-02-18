@@ -1,8 +1,17 @@
+import crypto from 'crypto';
+import fs from 'fs';
+import path from 'path';
+import handlebars from 'handlebars';
 import { prisma } from '../config/prisma-client.config';
-import { JWT_SECRET_TOKEN } from '../config/main.config';
+import {
+  JWT_SECRET_TOKEN,
+  FRONTEND_URL,
+  USER_EMAILER
+} from '../config/main.config';
 import { AppError } from '../utils/AppError';
 import { hashing, hashMatch } from '../helpers/bcrypt.helper';
 import { jwtCreateToken } from '../helpers/jwt.helper';
+import transporter from '../helpers/nodemailer.helper';
 import { Role, PrismaClient } from '../generated/prisma/client';
 
 type TransactionClient = Parameters<
@@ -47,6 +56,21 @@ async function getUniqueReferralCode(
   }
 
   return code;
+}
+
+const RESET_TOKEN_EXPIRY_MINUTES = 15;
+
+function generateResetToken(): { rawToken: string; hashedToken: string } {
+  const rawToken = crypto.randomBytes(32).toString('hex');
+  const hashedToken = crypto
+    .createHash('sha256')
+    .update(rawToken)
+    .digest('hex');
+  return { rawToken, hashedToken };
+}
+
+function hashToken(token: string): string {
+  return crypto.createHash('sha256').update(token).digest('hex');
 }
 
 export const authService = {
@@ -216,5 +240,114 @@ export const authService = {
       username: user.username,
       role: user.role
     };
+  },
+
+  async forgotPassword(email: string) {
+    const genericResponse = {
+      message:
+        'If an account with that email exists, a password reset link has been sent'
+    };
+
+    if (!email) {
+      throw new AppError('Email is required', 400);
+    }
+
+    const user = await prisma.user.findUnique({ where: { email } });
+
+    if (!user) {
+      return genericResponse;
+    }
+
+    await prisma.passwordResetToken.updateMany({
+      where: {
+        userId: user.id,
+        isUsed: false
+      },
+      data: { isUsed: true }
+    });
+
+    const { rawToken, hashedToken } = generateResetToken();
+    const expiredAt = new Date(
+      Date.now() + RESET_TOKEN_EXPIRY_MINUTES * 60 * 1000
+    );
+
+    await prisma.passwordResetToken.create({
+      data: {
+        userId: user.id,
+        token: hashedToken,
+        expiredAt
+      }
+    });
+
+    const resetLink = `${FRONTEND_URL}/reset-password?token=${rawToken}`;
+
+    const templatePath = path.join(
+      __dirname,
+      '../templates/password-reset.html'
+    );
+    const templateSource = fs.readFileSync(templatePath, 'utf-8');
+    const compiledTemplate = handlebars.compile(templateSource);
+    const html = compiledTemplate({
+      userName: user.fullName,
+      resetLink,
+      expirationTime: `${RESET_TOKEN_EXPIRY_MINUTES} minutes`
+    });
+
+    transporter
+      .sendMail({
+        from: USER_EMAILER,
+        to: user.email,
+        subject: 'Reset your TickiTacka password',
+        html
+      })
+      .catch((err: unknown) => {
+        console.error('Failed to send password reset email:', err);
+      });
+
+    return genericResponse;
+  },
+
+  async resetPassword(token: string, newPassword: string) {
+    if (!token || !newPassword) {
+      throw new AppError('Token and new password are required', 400);
+    }
+
+    if (newPassword.length < 6) {
+      throw new AppError('Password must be at least 6 characters long', 400);
+    }
+
+    const hashedToken = hashToken(token);
+
+    const resetToken = await prisma.passwordResetToken.findUnique({
+      where: { token: hashedToken }
+    });
+
+    if (!resetToken) {
+      throw new AppError('Invalid or expired reset token', 400);
+    }
+
+    if (resetToken.isUsed) {
+      throw new AppError('This reset token has already been used', 400);
+    }
+
+    if (new Date(resetToken.expiredAt) < new Date()) {
+      throw new AppError('This reset token has expired', 400);
+    }
+
+    const hashedPassword = await hashing(newPassword);
+
+    await prisma.$transaction(async (tx: TransactionClient) => {
+      await tx.user.update({
+        where: { id: resetToken.userId },
+        data: { password: hashedPassword }
+      });
+
+      await tx.passwordResetToken.update({
+        where: { id: resetToken.id },
+        data: { isUsed: true }
+      });
+    });
+
+    return { message: 'Password has been reset successfully' };
   }
 };

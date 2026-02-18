@@ -68,5 +68,29 @@ export const authController = {
       message: 'User auth is successful',
       data: result
     });
+  }),
+
+  forgotPassword: catchAsync(async (req: Request, res: Response) => {
+    const { email } = req.body;
+
+    const result = await authService.forgotPassword(email);
+
+    res.status(200).json({
+      success: true,
+      message: result.message,
+      data: null
+    });
+  }),
+
+  resetPassword: catchAsync(async (req: Request, res: Response) => {
+    const { token, newPassword } = req.body;
+
+    const result = await authService.resetPassword(token, newPassword);
+
+    res.status(200).json({
+      success: true,
+      message: result.message,
+      data: null
+    });
   })
 };
