@@ -19,6 +19,20 @@ transactionRouter.get(
   transactionController.organizerGetById
 );
 
+transactionRouter.patch(
+  '/:id/accept',
+  verifyToken,
+  roleGuard('EO'),
+  transactionController.accept
+);
+
+transactionRouter.patch(
+  '/:id/reject',
+  verifyToken,
+  roleGuard('EO'),
+  transactionController.reject
+);
+
 /**
  * CUSTOMER ROUTES (User role)
  */

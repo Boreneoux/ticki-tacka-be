@@ -112,5 +112,35 @@ export const transactionController = {
       message: 'Payment proof uploaded successfully',
       data: result
     });
+  }),
+
+  accept: catchAsync(async (req: Request, res: Response) => {
+    const transactionId = req.params.id as string;
+
+    const result = await transactionService.acceptTransaction(
+      req.user!.id,
+      transactionId
+    );
+
+    res.status(200).json({
+      success: true,
+      message: 'Transaction accepted successfully',
+      data: result
+    });
+  }),
+
+  reject: catchAsync(async (req: Request, res: Response) => {
+    const transactionId = req.params.id as string;
+
+    const result = await transactionService.rejectTransaction(
+      req.user!.id,
+      transactionId
+    );
+
+    res.status(200).json({
+      success: true,
+      message: 'Transaction rejected successfully',
+      data: result
+    });
   })
 };
