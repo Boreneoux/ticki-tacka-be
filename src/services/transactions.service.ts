@@ -937,5 +937,62 @@ export const transactionService = {
       });
 
     return result;
+  },
+
+  async _rollbackTransactionData(tx: TransactionClient, transactionId: string) {
+    // 1. Restore soldCount on ticket types
+    const items = await tx.transactionItem.findMany({
+      where: { transactionId }
+    });
+
+    for (const item of items) {
+      await tx.ticketType.update({
+        where: { id: item.ticketTypeId },
+        data: { soldCount: { decrement: item.quantity } }
+      });
+    }
+
+    const pointUsages = await tx.pointUsage.findMany({
+      where: { transactionId }
+    });
+
+    for (const pu of pointUsages) {
+      await tx.userPoint.update({
+        where: { id: pu.userPointId },
+        data: {
+          amount: { increment: pu.amountUsed },
+          isUsed: false
+        }
+      });
+    }
+
+    await tx.pointUsage.deleteMany({
+      where: { transactionId }
+    });
+
+    // 3. Restore coupon (mark as unused)
+    const transaction = await tx.transaction.findUnique({
+      where: { id: transactionId }
+    });
+
+    if (transaction?.userCouponId) {
+      await tx.userCoupon.update({
+        where: { id: transaction.userCouponId },
+        data: { isUsed: false, usedAt: null }
+      });
+    }
+
+    // 4. Restore voucher (decrement usedCount)
+    if (transaction?.eventVoucherId) {
+      await tx.eventVoucher.update({
+        where: { id: transaction.eventVoucherId },
+        data: { usedCount: { decrement: 1 } }
+      });
+
+      // Delete voucher usage records
+      await tx.eventVoucherUsage.deleteMany({
+        where: { transactionId }
+      });
+    }
   }
 };

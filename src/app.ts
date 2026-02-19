@@ -15,6 +15,7 @@ import reviewRouter from './routes/reviews.router';
 import { organizerReviewRouter } from './routes/reviews.router';
 import dashboardRouter from './routes/dashboard.router';
 
+import { mainJobs } from './jobs/main.job';
 import { corsOptions } from './config/cors.config';
 import { PORT } from './config/main.config';
 
@@ -43,4 +44,7 @@ app.listen(serverPort, () => {
   console.log(
     `⚡️[server]: Server is running at http://localhost:${serverPort}`
   );
+
+  // Start cron jobs
+  mainJobs();
 });
