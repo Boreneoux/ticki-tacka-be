@@ -2,6 +2,13 @@ import { Router } from 'express';
 import { eventController } from '../controllers/events.controller';
 import { verifyToken, roleGuard } from '../middlewares/auth.middleware';
 import { multerUpload } from '../helpers/multer.helper';
+import {
+  createEventValidator,
+  updateEventValidator,
+  getAllEventsValidator,
+  createVoucherValidator
+} from '../validators/event.validator';
+import { expressRequestValidation } from '../middlewares/express-request-validation.middleware';
 import ticketTypeRouter from './ticket-types.router';
 
 const eventRouter = Router();
@@ -9,7 +16,13 @@ const eventRouter = Router();
 /**
  * PUBLIC ROUTES
  */
-eventRouter.get('/', eventController.getAll);
+eventRouter.get(
+  '/',
+  getAllEventsValidator,
+  expressRequestValidation,
+  eventController.getAll
+);
+
 eventRouter.get('/:slug', eventController.getDetail);
 
 /**
@@ -20,6 +33,8 @@ eventRouter.post(
   verifyToken,
   roleGuard('EO'),
   multerUpload('', 'IMG-EVENT').array('images', 3),
+  createEventValidator,
+  expressRequestValidation,
   eventController.create
 );
 
@@ -28,6 +43,8 @@ eventRouter.put(
   verifyToken,
   roleGuard('EO'),
   multerUpload('', 'IMG-EVENT').array('images', 3),
+  updateEventValidator,
+  expressRequestValidation,
   eventController.update
 );
 
@@ -42,6 +59,8 @@ eventRouter.post(
   '/:eventId/vouchers',
   verifyToken,
   roleGuard('EO'),
+  createVoucherValidator,
+  expressRequestValidation,
   eventController.createVoucher
 );
 

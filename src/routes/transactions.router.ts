@@ -2,6 +2,12 @@ import { Router } from 'express';
 import { transactionController } from '../controllers/transactions.controller';
 import { verifyToken, roleGuard } from '../middlewares/auth.middleware';
 import { multerUpload } from '../helpers/multer.helper';
+import {
+  createTransactionValidator,
+  getCustomerTransactionsValidator,
+  getOrganizerTransactionsValidator
+} from '../validators/transaction.validator';
+import { expressRequestValidation } from '../middlewares/express-request-validation.middleware';
 
 const transactionRouter = Router();
 
@@ -9,6 +15,8 @@ transactionRouter.get(
   '/organizer',
   verifyToken,
   roleGuard('EO'),
+  getOrganizerTransactionsValidator,
+  expressRequestValidation,
   transactionController.organizerGetAll
 );
 
@@ -40,6 +48,8 @@ transactionRouter.post(
   '/',
   verifyToken,
   roleGuard('User'),
+  createTransactionValidator,
+  expressRequestValidation,
   transactionController.create
 );
 
@@ -47,6 +57,8 @@ transactionRouter.get(
   '/',
   verifyToken,
   roleGuard('User'),
+  getCustomerTransactionsValidator,
+  expressRequestValidation,
   transactionController.getAll
 );
 

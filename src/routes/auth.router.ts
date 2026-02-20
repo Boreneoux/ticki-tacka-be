@@ -2,6 +2,13 @@ import { Router } from 'express';
 import rateLimit from 'express-rate-limit';
 import { authController } from '../controllers/auth.controller';
 import { verifyToken } from '../middlewares/auth.middleware';
+import {
+  registerValidator,
+  loginValidator,
+  forgotPasswordValidator,
+  resetPasswordValidator
+} from '../validators/auth.validator';
+import { expressRequestValidation } from '../middlewares/express-request-validation.middleware';
 
 const authRouter = Router();
 
@@ -18,14 +25,35 @@ const forgotPasswordLimiter = rateLimit({
   legacyHeaders: false
 });
 
-authRouter.post('/register', authController.register);
-authRouter.post('/login', authController.login);
+authRouter.post(
+  '/register',
+  registerValidator,
+  expressRequestValidation,
+  authController.register
+);
+
+authRouter.post(
+  '/login',
+  loginValidator,
+  expressRequestValidation,
+  authController.login
+);
+
 authRouter.get('/session', verifyToken, authController.session);
+
 authRouter.post(
   '/forgot-password',
   forgotPasswordLimiter,
+  forgotPasswordValidator,
+  expressRequestValidation,
   authController.forgotPassword
 );
-authRouter.post('/reset-password', authController.resetPassword);
+
+authRouter.post(
+  '/reset-password',
+  resetPasswordValidator,
+  expressRequestValidation,
+  authController.resetPassword
+);
 
 export default authRouter;
