@@ -238,7 +238,10 @@ export const authService = {
 
     return {
       username: user.username,
-      role: user.role
+      role: user.role,
+      fullName: user.fullName,
+      email: user.email,
+      profilePictureUrl: user.profilePictureUrl
     };
   },
 
