@@ -41,6 +41,8 @@ authRouter.post(
 
 authRouter.get('/session', verifyToken, authController.session);
 
+authRouter.post('/logout', verifyToken, authController.logout);
+
 authRouter.post(
   '/forgot-password',
   forgotPasswordLimiter,

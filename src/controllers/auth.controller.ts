@@ -92,5 +92,15 @@ export const authController = {
       message: result.message,
       data: null
     });
+  }),
+
+  logout: catchAsync(async (_req: Request, res: Response) => {
+    res.clearCookie('accessToken', cookieOptions);
+
+    res.status(200).json({
+      success: true,
+      message: 'Logout successful',
+      data: null
+    });
   })
 };
