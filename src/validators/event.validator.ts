@@ -127,6 +127,11 @@ export const getAllEventsValidator = [
 
   query('city').optional().isUUID().withMessage('City must be a valid UUID'),
 
+  query('organizerId')
+    .optional()
+    .isUUID()
+    .withMessage('OrganizerId must be a valid UUID'),
+
   query('page')
     .optional()
     .isInt({ min: 1 })

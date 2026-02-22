@@ -49,6 +49,7 @@ interface GetAllEventsQuery {
   search?: string;
   category?: string;
   city?: string;
+  organizerId?: string;
   page?: string;
   limit?: string;
 }
@@ -182,7 +183,14 @@ export const eventService = {
   },
 
   async getAllEvents(query: GetAllEventsQuery) {
-    const { search, category, city, page = '1', limit = '10' } = query;
+    const {
+      search,
+      category,
+      city,
+      organizerId,
+      page = '1',
+      limit = '10'
+    } = query;
 
     const pageNum = Math.max(1, Number(page));
     const limitNum = Math.max(1, Math.min(50, Number(limit)));
@@ -204,6 +212,7 @@ export const eventService = {
 
     if (category) where.categoryId = category;
     if (city) where.cityId = city;
+    if (organizerId) where.organizerId = organizerId;
 
     const [events, totalItems] = await Promise.all([
       prisma.event.findMany({
@@ -237,7 +246,8 @@ export const eventService = {
       where: { slug },
       include: {
         category: true,
-        city: true,
+        city: { include: { province: true } },
+        organizer: { include: { user: true } },
         eventImages: true,
         ticketTypes: true,
         eventVouchers: true
@@ -258,7 +268,8 @@ export const eventService = {
         data: { status: 'completed' },
         include: {
           category: true,
-          city: true,
+          city: { include: { province: true } },
+          organizer: { include: { user: true } },
           eventImages: true,
           ticketTypes: true,
           eventVouchers: true

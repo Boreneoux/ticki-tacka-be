@@ -6,7 +6,8 @@
     "test": "echo \"Error: no test specified\" && exit 1",
     "dev": "nodemon",
     "build": "tsc",
-    "start": "node dist/app.ts"
+    "start": "node dist/app.ts",
+    "seed:demo": "ts-node prisma/seed-demo.ts"
   },
   "keywords": [],
   "author": "",

@@ -14,6 +14,7 @@ import transactionRouter from './routes/transactions.router';
 import reviewRouter from './routes/reviews.router';
 import { organizerReviewRouter } from './routes/reviews.router';
 import dashboardRouter from './routes/dashboard.router';
+import organizerPublicRouter from './routes/organizer-public.router';
 
 import { mainJobs } from './jobs/main.job';
 import { corsOptions } from './config/cors.config';
@@ -35,6 +36,7 @@ app.use('/api/transactions', transactionRouter);
 app.use('/api/events', eventRouter);
 app.use('/api/categories', categoryRouter);
 app.use('/api/events/:eventId/reviews', reviewRouter);
+app.use('/api/organizers', organizerPublicRouter);
 app.use('/api/organizers/:organizerId/reviews', organizerReviewRouter);
 app.use('/api/organizer', dashboardRouter);
 // Centralized Error Handler
