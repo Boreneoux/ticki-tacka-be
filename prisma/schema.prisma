@@ -360,7 +360,7 @@ model Transaction {
   couponDiscount  Int     @default(0) @map("coupon_discount")
   voucherDiscount Int     @default(0) @map("voucher_discount")
   totalAmount     Int     @map("total_amount")
-  paymentStatus   String  @default("waiting_for_payment") @map("payment_status") @db.VarChar(20)
+  paymentStatus   String  @default("waiting_for_payment") @map("payment_status") @db.VarChar(35)
   paymentProofUrl String? @map("payment_proof_url") @db.Text
 
   proofUploadedAt      DateTime? @map("proof_uploaded_at")
