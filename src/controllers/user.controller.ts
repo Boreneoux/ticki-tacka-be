@@ -44,5 +44,29 @@ export const userController = {
       message: 'Password changed successfully',
       data: null
     });
+  }),
+
+  getUserPoints: catchAsync(async (req: Request, res: Response) => {
+    const { id } = req.user!;
+
+    const result = await userService.getUserPoints(id);
+
+    res.status(200).json({
+      success: true,
+      message: 'User points retrieved successfully',
+      data: result
+    });
+  }),
+
+  getUserCoupons: catchAsync(async (req: Request, res: Response) => {
+    const { id } = req.user!;
+
+    const result = await userService.getUserCoupons(id);
+
+    res.status(200).json({
+      success: true,
+      message: 'User coupons retrieved successfully',
+      data: result
+    });
   })
 };

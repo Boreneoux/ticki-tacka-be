@@ -36,8 +36,20 @@ export const userService = {
       throw new AppError('User not found', 404);
     }
 
+    const pointAggregate = await prisma.userPoint.aggregate({
+      where: {
+        userId,
+        isUsed: false,
+        expiredAt: { gt: new Date() }
+      },
+      _sum: { amount: true }
+    });
+
     const { password: _, ...userWithoutPassword } = user;
-    return userWithoutPassword;
+    return {
+      ...userWithoutPassword,
+      pointBalance: pointAggregate._sum.amount ?? 0
+    };
   },
 
   async updateProfile(
@@ -182,5 +194,101 @@ export const userService = {
       where: { id: userId },
       data: { password: hashedNewPassword }
     });
+  },
+
+  async getUserPoints(userId: string) {
+    const now = new Date();
+
+    const userPoints = await prisma.userPoint.findMany({
+      where: { userId, deletedAt: null },
+      include: {
+        pointUsages: {
+          include: {
+            transaction: {
+              select: { invoiceNumber: true, createdAt: true }
+            }
+          }
+        }
+      },
+      orderBy: { createdAt: 'desc' }
+    });
+
+    const points = userPoints.map(point => {
+      let status: 'active' | 'used' | 'expired';
+
+      if (point.isUsed) {
+        status = 'used';
+      } else if (point.expiredAt < now) {
+        status = 'expired';
+      } else {
+        status = 'active';
+      }
+
+      return {
+        id: point.id,
+        amount: point.amount,
+        source: point.source,
+        status,
+        expiredAt: point.expiredAt,
+        createdAt: point.createdAt,
+        usageHistory: point.pointUsages.map(usage => ({
+          amountUsed: usage.amountUsed,
+          invoiceNumber: usage.transaction.invoiceNumber,
+          usedAt: usage.transaction.createdAt
+        }))
+      };
+    });
+
+    const balance = points
+      .filter(p => p.status === 'active')
+      .reduce((sum, p) => sum + p.amount, 0);
+
+    return { balance, points };
+  },
+
+  async getUserCoupons(userId: string) {
+    const now = new Date();
+
+    const userCoupons = await prisma.userCoupon.findMany({
+      where: { userId, deletedAt: null },
+      include: {
+        transactions: {
+          select: { invoiceNumber: true, createdAt: true },
+          take: 1
+        }
+      },
+      orderBy: { createdAt: 'desc' }
+    });
+
+    const coupons = userCoupons.map(coupon => {
+      let status: 'active' | 'used' | 'expired';
+
+      if (coupon.isUsed) {
+        status = 'used';
+      } else if (coupon.expiredAt < now) {
+        status = 'expired';
+      } else {
+        status = 'active';
+      }
+
+      return {
+        id: coupon.id,
+        couponCode: coupon.couponCode,
+        discountType: coupon.discountType,
+        discountValue: coupon.discountValue,
+        status,
+        expiredAt: coupon.expiredAt,
+        usedAt: coupon.usedAt,
+        createdAt: coupon.createdAt,
+        usedInTransaction: coupon.transactions[0]
+          ? {
+              invoiceNumber: coupon.transactions[0].invoiceNumber,
+              transactionDate: coupon.transactions[0].createdAt
+            }
+          : null
+      };
+    });
+
+    return { coupons };
   }
 };

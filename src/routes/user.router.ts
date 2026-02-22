@@ -29,4 +29,8 @@ userRouter.patch(
   userController.changePassword
 );
 
+userRouter.get('/points', verifyToken, userController.getUserPoints);
+
+userRouter.get('/coupons', verifyToken, userController.getUserCoupons);
+
 export default userRouter;
