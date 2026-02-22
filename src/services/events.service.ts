@@ -69,7 +69,7 @@ export const eventService = {
       throw new AppError('At least one ticket type is required', 400);
     }
 
-    const ticketNames = ticketTypes.map((t) => t.name);
+    const ticketNames = ticketTypes.map(t => t.name);
     const uniqueNames = new Set(ticketNames);
     if (uniqueNames.size !== ticketNames.length) {
       throw new AppError('Duplicate ticket type names are not allowed', 400);
@@ -98,42 +98,38 @@ export const eventService = {
     const slug = await generateUniqueSlug(data.name);
 
     // Use $transaction to atomically create event + ticket types
-    const event = await prisma.$transaction(
-      async (tx: TransactionClient) => {
-        const createdEvent = await tx.event.create({
-          data: {
-            name: data.name,
-            slug,
-            categoryId: data.categoryId,
-            eventDate: new Date(data.eventDate),
-            eventTime: new Date(`1970-01-01T${data.eventTime}`),
-            endDate: data.endDate ? new Date(data.endDate) : null,
-            endTime: data.endTime
-              ? new Date(`1970-01-01T${data.endTime}`)
-              : null,
-            cityId: data.cityId,
-            venueName: data.venueName,
-            venueAddress: data.venueAddress,
-            description: data.description,
-            organizerId: organizer.id,
-            status: 'draft'
-          }
-        });
+    const event = await prisma.$transaction(async (tx: TransactionClient) => {
+      const createdEvent = await tx.event.create({
+        data: {
+          name: data.name,
+          slug,
+          categoryId: data.categoryId,
+          eventDate: new Date(data.eventDate),
+          eventTime: new Date(`1970-01-01T${data.eventTime}`),
+          endDate: data.endDate ? new Date(data.endDate) : null,
+          endTime: data.endTime ? new Date(`1970-01-01T${data.endTime}`) : null,
+          cityId: data.cityId,
+          venueName: data.venueName,
+          venueAddress: data.venueAddress,
+          description: data.description,
+          organizerId: organizer.id,
+          status: 'draft'
+        }
+      });
 
-        // Create ticket types (inside the same transaction)
-        await tx.ticketType.createMany({
-          data: ticketTypes.map((ticket) => ({
-            eventId: createdEvent.id,
-            name: ticket.name,
-            description: ticket.description || null,
-            price: Number(ticket.price),
-            quota: Number(ticket.quota)
-          }))
-        });
+      // Create ticket types (inside the same transaction)
+      await tx.ticketType.createMany({
+        data: ticketTypes.map(ticket => ({
+          eventId: createdEvent.id,
+          name: ticket.name,
+          description: ticket.description || null,
+          price: Number(ticket.price),
+          quota: Number(ticket.quota)
+        }))
+      });
 
-        return createdEvent;
-      }
-    );
+      return createdEvent;
+    });
 
     // Upload images (outside transaction — Cloudinary is not a DB operation)
     if (files?.length) {
@@ -188,6 +184,9 @@ export const eventService = {
   async getAllEvents(query: GetAllEventsQuery) {
     const { search, category, city, page = '1', limit = '10' } = query;
 
+    const pageNum = Math.max(1, Number(page));
+    const limitNum = Math.max(1, Math.min(50, Number(limit)));
+
     const where: any = {
       deletedAt: null,
       status: 'published',
@@ -206,18 +205,31 @@ export const eventService = {
     if (category) where.categoryId = category;
     if (city) where.cityId = city;
 
-    return prisma.event.findMany({
-      where,
-      include: {
-        category: true,
-        city: true,
-        eventImages: true,
-        ticketTypes: true
-      },
-      skip: (Number(page) - 1) * Number(limit),
-      take: Number(limit),
-      orderBy: { eventDate: 'asc' }
-    });
+    const [events, totalItems] = await Promise.all([
+      prisma.event.findMany({
+        where,
+        include: {
+          category: true,
+          city: true,
+          eventImages: true,
+          ticketTypes: true
+        },
+        skip: (pageNum - 1) * limitNum,
+        take: limitNum,
+        orderBy: { eventDate: 'asc' }
+      }),
+      prisma.event.count({ where })
+    ]);
+
+    return {
+      events,
+      pagination: {
+        currentPage: pageNum,
+        totalPages: Math.ceil(totalItems / limitNum),
+        totalItems,
+        limit: limitNum
+      }
+    };
   },
 
   async getEventBySlug(slug: string) {
@@ -237,7 +249,10 @@ export const eventService = {
     }
 
     // On-the-fly: auto-mark as completed if eventDate has passed
-    if (event.status === 'published' && new Date(event.eventDate) < new Date()) {
+    if (
+      event.status === 'published' &&
+      new Date(event.eventDate) < new Date()
+    ) {
       const updated = await prisma.event.update({
         where: { id: event.id },
         data: { status: 'completed' },
@@ -432,7 +447,12 @@ export const eventService = {
     }
 
     // Validate event completeness before publishing
-    if (!event.categoryId || !event.cityId || !event.venueName || !event.description) {
+    if (
+      !event.categoryId ||
+      !event.cityId ||
+      !event.venueName ||
+      !event.description
+    ) {
       throw new AppError(
         'Event must have category, city, venue name, and description before publishing',
         400
